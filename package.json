@@ -12,6 +12,7 @@
 	"activationEvents": [
 		"onCommand:workspace-files.findFile"
 	],
+	"publisher": "ryan-bigg",
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [

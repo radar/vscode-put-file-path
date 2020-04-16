@@ -14,18 +14,17 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       const file = await pickFile();
       if (file) {
-        let path = file.path;
-        const pathParts = path.split("/");
+        const pathParts = file.split("/");
         const workDirPos = pathParts.indexOf("ticketee");
 
-        path = pathParts.slice(workDirPos + 1).join("/");
+        const shortPath = pathParts.slice(workDirPos + 1).join("/");
 
         const currentPosition =
           vscode.window.activeTextEditor?.selection.active;
 
         if (currentPosition) {
           vscode.window.activeTextEditor?.edit((editBuilder) => {
-            editBuilder.insert(currentPosition, path);
+            editBuilder.insert(currentPosition, shortPath);
           });
         }
       }

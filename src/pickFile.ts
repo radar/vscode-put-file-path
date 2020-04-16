@@ -38,84 +38,58 @@ class MessageItem implements QuickPickItem {
 }
 
 export async function pickFile() {
-  const disposables: Disposable[] = [];
-  try {
-    return await new Promise<Uri | undefined>((resolve, reject) => {
-      const input = window.createQuickPick<FileItem | MessageItem>();
-      input.placeholder = "Type to search for files";
-      let rgs: cp.ChildProcess[] = [];
-      disposables.push(
-        input.onDidChangeValue((value) => {
-          rgs.forEach((rg) => rg.kill());
-          if (!value) {
-            input.items = [];
-            return;
-          }
-          input.busy = true;
-          const cwds = workspace.workspaceFolders
-            ? workspace.workspaceFolders.map((f) => f.uri.fsPath)
-            : [process.cwd()];
-          const q = process.platform === "win32" ? '"' : "'";
-          rgs = cwds.map((cwd) => {
-            const rg = cp.exec(
-              `rg --files --iglob ${q}*${value}*${q}`,
-              { cwd },
-              (err, stdout) => {
-                const i = rgs.indexOf(rg);
-                if (i !== -1) {
-                  if (rgs.length === cwds.length) {
-                    input.items = [];
-                  }
-                  if (!err) {
-                    input.items = input.items.concat(
-                      stdout
-                        .split("\n")
-                        .slice(0, 50)
-                        .map(
-                          (relative) =>
-                            new FileItem(
-                              Uri.file(cwd),
-                              Uri.file(path.join(cwd, relative))
-                            )
-                        )
-                    );
-                  }
-                  if (
-                    err &&
-                    !(<any>err).killed &&
-                    (<any>err).code !== 1 &&
-                    err.message
-                  ) {
-                    input.items = input.items.concat([
-                      new MessageItem(Uri.file(cwd), err.message),
-                    ]);
-                  }
-                  rgs.splice(i, 1);
-                  if (!rgs.length) {
-                    input.busy = false;
-                  }
-                }
-              }
-            );
-            return rg;
-          });
-        }),
-        input.onDidChangeSelection((items) => {
-          const item = items[0];
-          if (item instanceof FileItem) {
-            resolve(item.uri);
-            input.hide();
-          }
-        }),
-        input.onDidHide(() => {
-          rgs.forEach((rg) => rg.kill());
-          resolve(undefined);
-          input.dispose();
-        })
-      );
-      input.show();
+  return await new Promise<string | undefined>((resolve, reject) => {
+    const input = window.createQuickPick<QuickPickItem>();
+
+    input.matchOnDetail = true;
+    input.matchOnDescription = true;
+    input.placeholder = "Type to search for files";
+    input.onDidChangeValue((value) => {
+      if (!value) {
+        input.items = [];
+        return;
+      }
+      input.busy = true;
+      input.items = [];
+
+      const cwds = workspace.workspaceFolders
+        ? workspace.workspaceFolders.map((f) => f.uri.fsPath)
+        : [process.cwd()];
+      cwds.map((cwd) => {
+        console.log("--------------");
+        console.log(`fd --type f | fzf -f "${value}"`);
+        const fzf = cp.spawn(`fd --type f | fzf -f "${value}"`, {
+          cwd: cwd,
+          shell: true,
+        });
+
+        fzf.stdout.on("data", (stdout: string) => {
+          console.log(String(stdout));
+          let items = String(stdout).split("\n");
+          const files = items
+            .filter((item) => item !== "")
+            .slice(0, 50)
+            .map((relative) => {
+              return {
+                alwaysShow: true,
+                label: relative,
+              };
+            });
+          console.log(files);
+          input.items = input.items.concat(files);
+        });
+      });
+
+      input.busy = false;
     });
-  } finally {
-    disposables.forEach((d) => d.dispose());
-  }
+
+    input.onDidChangeSelection((items) => {
+      const item = items[0];
+      resolve(item.label);
+
+      input.hide();
+    });
+
+    input.show();
+  });
 }
